@@ -12,6 +12,8 @@ build
 apps/web/src/routeTree.gen.ts
 local.db
 local.db-*
+docs
+specs
 
 # Environment variables
 .env
@@ -56,3 +58,4 @@ coverage
 .cache
 tmp
 temp
+

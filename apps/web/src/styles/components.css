@@ -1,0 +1,52 @@
+/*
+ * Shared component-level utilities (reused across several components).
+ * Single-use styles stay inline as Tailwind classes in the JSX.
+ */
+
+/* Dark inset text field (token input, search, inline value editors) */
+@utility field-input {
+	@apply bg-surface-container-lowest text-on-surface rounded-sm placeholder:text-outline/70;
+	@apply transition-shadow focus:outline-none focus:ring-1 focus:ring-primary;
+}
+
+/* Small square icon-only ghost button (copy / delete / eye toggle) */
+@utility icon-btn {
+	@apply inline-flex items-start justify-center h-[33px] p-1.5 rounded-xs text-outline transition-colors;
+	@apply hover:text-on-surface hover:bg-surface-container-high;
+	@apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
+}
+
+/* Inline monospace chip: field keys, scopes, versions */
+@utility code-chip {
+	@apply font-mono text-code-inline px-1.5 py-0.5 rounded-xs bg-surface-container-high;
+}
+
+/* Status beacon dot */
+@utility status-dot {
+	@apply inline-block size-1.5 shrink-0 rounded-full;
+}
+
+/* Hide scrollbars while keeping scrolling */
+@utility no-scrollbar {
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+/* Material Symbols matches the original design rather than approximate SVGs. */
+.design-icon {
+	font-family: "Material Symbols Outlined", sans-serif;
+	font-weight: normal;
+	font-style: normal;
+	display: inline-block;
+	line-height: 1;
+	letter-spacing: normal;
+	text-transform: none;
+	white-space: nowrap;
+	overflow-wrap: normal;
+	direction: ltr;
+	font-feature-settings: "liga";
+	-webkit-font-smoothing: antialiased;
+	flex-shrink: 0;
+}

@@ -1,0 +1,10 @@
+# 项目踩坑与教训(AGENTS.md)
+
+- [T-001] 环境陷阱:根 package.json 的 `pnpm run check` 实际是 `biome check --write .`,会对全仓库(apps/web、packages/ui、packages/db、biome.json、tsconfig 等约 68 个文件)写入格式化,改动远超 task 范围,且仓库里已有一些与本 task 无关的 lint 错误;校验时只用 `npx biome check <本 task 改动的路径>`(不带 `--write`),绝不跑 `pnpm run check` 或对 `.` 用 `--write`。
+- [T-001] 前置步骤:开工前先 `git status` 记下基线(哪些文件已是 ` M`/`??`),因为整体回滚命令(如 `git checkout -- .`)会被权限系统拒绝,误改只能逐个文件还原,有基线才能分清哪些改动是本 task 造成的。
+- [T-002] GitHub API 坑:403 有歧义——主限流也返回 403(配 `x-ratelimit-remaining: 0`),必须先判限流头再归为 `SCOPE_MISSING`;另外 `/user/emails` 在 token 缺 `user:email` scope 时常返回 404 而非 403,要按路径特判为 `SCOPE_MISSING`,别当成 `UPSTREAM_UNAVAILABLE`。测试/mock 时两种情况都要覆盖。
+- [T-002] GitHub API 坑:fine-grained PAT 的响应里没有 `x-oauth-scopes` 头,解析出空 scopes 不代表"无权限";后续做 scope 判断/展示时不能用"scopes 为空"推断缺权限,应以实际请求的 403/404 结果为准。
+- [T-003] Hono 子应用错误处理坑:`routes/github.ts` 在子应用上调用了 `github.onError(onError)`,而 Hono v4 的 `app.route()` 会让子应用自己的 errorHandler 优先于父应用的 `app.onError`,所以 `/api/github/*` 的异常(包括 `requireToken` 抛出的 `TOKEN_MISSING`)不会走 index.ts 的全局 onError;要改错误响应格式就改共享的 `onError` 函数并在两处复用,不要在 index.ts 另写一套。
+- [T-005] Hono CORS 预检坑:子应用用 `github.use("*", requireToken)` 会匹配所有方法(含 OPTIONS),而浏览器预检请求不带 `Authorization` 头;`index.ts` 里必须先 `app.use("/*", cors(...))` 再 `app.route("/", github)`,让 cors 中间件先拦截并直接响应 OPTIONS,否则预检会被 requireToken 判为 400 TOKEN_MISSING、前端请求全挂。新增带鉴权中间件的子路由时保持此注册顺序,测试里补一条 OPTIONS 预检用例。
+- [T-006] 测试坑:`app.ts` 依赖 `env.server.ts`(内含 `varlock/auto-load`,会校验 CORS_ORIGIN/DATABASE_URL),测试里必须先 `vi.mock("../env.server", () => ({ ENV: {...} }))` 再 `await import("../app")`,不要依赖本地 `.env`;入口已拆为 `app.ts`(导出 app)+ `index.ts`(仅 `serve()`),测试只导入 `app.ts`,避免真的监听端口。服务端测试用 `pnpm --filter server test` 或 `turbo run test -F server`。
+- [T-006] 测试坑:GitHub client 用 `AbortSignal.timeout(REQUEST_TIMEOUT_MS)` 做超时,`vi.useFakeTimers()` 推进不了这个原生计时器,别等真超时;超时用例应让 mock fetch 断言 `init.signal` 是 `AbortSignal` 后直接 `Promise.reject(new DOMException("...", "TimeoutError"))`。`vi.stubGlobal("fetch", ...)` 必须配 `afterEach(() => vi.unstubAllGlobals())`,否则 mock 会漏到其他用例。

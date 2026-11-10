@@ -47,6 +47,20 @@ globs: ["**/*.test.ts", "**/_.test.tsx", "**/_.spec.ts", "**/*.spec.tsx", "apps/
   - 带鉴权中间件的路由要补 OPTIONS 预检用例；GitHub 403 需区分限流（`x-ratelimit-remaining: 0`）与缺 scope，`/user/emails` 的 404 也按缺 scope 覆盖。
 - 改了 `apps/server` 时，完成前除类型检查外还需 `pnpm -F server test` 全绿。
 
+## 前端测试现状（已落地，优先于上文"web 目前仍无测试"的描述）
+
+- `apps/web` 已接入 Vitest：`package.json` 有 `"test": "vitest run"`，使用独立的 `apps/web/vitest.config.ts`（不复用 `vite.config.ts`，其中 react-router / varlock 插件在 vitest 下会干扰运行）。
+- 配置要点：自行声明 `@` → `./src` alias；默认 `environment: "node"`，`include: ["src/**/*.test.{ts,tsx}"]`。纯 view-model / lib 测试用默认 node 环境；组件测试按文件切 jsdom（文件头 `// @vitest-environment jsdom`），并补装 `@testing-library/react`、`jsdom`。
+- 运行：`pnpm -F web test`；全仓库：`pnpm -r test`（或 `turbo run test`）。
+- 参考用例：`apps/web/src/features/profile-sync/lib/profile-view-model.test.ts`。组件不直接消费原始 GitHub API 对象，复杂逻辑优先下沉到 view-model / lib 并在那里测。
+- 必须覆盖的已知坑反例（见 AGENTS.md）：
+  - `/user` 字段全为 null / 空串（展示名回退 `login`、数值兜底 0）；`blog` 为空串、无协议、`host:port`、`javascript:`。
+  - 邮箱徽章「仅次要邮箱已验证」不亮（`primary && verified`）。
+  - scope 对比「只有父级 scope」（如 `user` 满足 `read:user`、`user:email`）。
+  - sessionStorage「getItem 正常、setItem 抛错」降级；api 层「fetch 成功、`json()` reject AbortError」仍抛出 abort。
+  - 带本地编辑状态的面板「编辑后再次同步，编辑仍在」。
+- 改了 `apps/web` 时，完成前需 `pnpm -F web test` 全绿。
+
 ## 禁止
 
 - 为了让检查通过而删除或跳过已有测试（`it.skip`、`describe.only` 不能提交）。

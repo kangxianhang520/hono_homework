@@ -62,3 +62,10 @@ globs: apps/server/**
 ## 测试
 
 - 路由测试优先使用 `app.request()`（Hono 内置）发起请求，不启动真实端口；对上游 `fetch` 做 mock，不调用真实第三方 API。
+
+## 应用入口拆分（补充）
+
+- 实际结构：`src/app.ts` 导出 `app`（全局中间件、CORS、`app.route()`、`onError` / `notFound` 在此组装）；`src/index.ts` 只负责 `serve({ fetch: app.fetch, port: 3000 })`。上文“`src/index.ts` 做应用组装”以此为准。
+- 测试从 `@/app`（或 `../app`）导入 `app` 调用 `app.request()`，不要导入 `index.ts`（会启动真实端口）。
+- `cors()` 中间件必须在带鉴权中间件的子路由之前注册，否则 OPTIONS 预检会被 `requireToken` 等拦截。
+- 路由测试文件与路由同目录放置：`src/routes/<domain>.test.ts`。

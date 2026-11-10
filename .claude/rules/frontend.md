@@ -57,3 +57,19 @@ globs: apps/web/**/*.{ts,tsx,css}, packages/ui/**/*.{ts,tsx,css}
 
 - Tab 缩进、双引号；自闭合空元素；`const` 优先、禁止参数重新赋值、禁止无用 else、`as const` 断言。
 - 不要提交未使用的导入/变量；Biome organizeImports 自动排序导入。
+
+## 测试（apps/web）
+
+- 测试框架 Vitest，配置为独立的 `apps/web/vitest.config.ts`（不复用 `vite.config.ts`，其中 react-router / varlock 插件在 vitest 下会干扰）；已配置 `@` → `./src` 别名，`include: src/**/*.test.{ts,tsx}`。
+- 运行：`pnpm -F web test`（`vitest run`）。测试文件与被测文件同目录，命名 `<name>.test.ts(x)`（如 `features/profile-sync/lib/profile-view-model.test.ts`）。
+- 默认 `environment: "node"`，纯 lib / view-model 测试即可；组件测试在文件内按需切换到 jsdom，不要全局改环境。
+- 优先把逻辑下沉到 `features/<feature>/lib/` 的纯函数并为其写单测（空值、边界、反例条件都要覆盖）。
+
+## Feature 内部分层与已知约定
+
+- feature 内常见分层：`api/`（请求与响应类型）、`lib/`（view-model 等纯函数）、`hooks/`、`components/`、`<feature>-context.tsx`（跨组件共享状态，如 `sync-context.tsx`）。
+- 组件不直接消费原始 GitHub API 对象，先经 `lib/profile-view-model.ts` 归一（空串/空白 → null、数值兜底 0、`blog` 用 `normalizeBlogUrl` 只放行 http/https）。
+- api 层所有包住 `res.json()` / `res.text()` 的 catch 先 `if (isAbortError(e)) throw e`，再降级为业务错误码，保证调用方能区分「取消」与「失败」。
+- 弹窗复用 `src/components/ui/dialog.tsx`（原生 `<dialog>` 封装，Esc 关闭需在 `onClose` 同步 `open` state），不要手写遮罩层或引入弹窗库。
+- 加载态不要用三元把带本地编辑状态的组件整体替换为骨架屏（会卸载并丢失未保存编辑）；骨架屏只用于首次无数据，之后用遮罩 / `aria-busy` 保持挂载。
+- 按钮回调必须调用真实的 context/api 方法，禁止只弹成功 toast 的假成功；未实现的操作应禁用并标注 TODO 所属 task。

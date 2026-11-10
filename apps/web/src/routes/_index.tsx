@@ -29,7 +29,8 @@ export default function ProfileOverviewPage() {
 			<PageToolbar user={userLabel} page="PAT 凭证与扩展字段管理" />
 			<TokenCard />
 			<ProfileSection />
-			{loading ? <FieldsTableSkeleton /> : <FieldsPanel />}
+			{/* 骨架屏只用于首次无数据;重新同步时保持 FieldsPanel 挂载,避免丢失未提交的编辑 */}
+			{loading && !snapshot ? <FieldsTableSkeleton /> : <FieldsPanel />}
 		</>
 	);
 }

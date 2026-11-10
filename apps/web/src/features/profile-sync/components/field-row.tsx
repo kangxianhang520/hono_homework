@@ -1,66 +1,48 @@
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/button";
-import { Copy, KeyRound, Lock, Trash2 } from "@/components/ui/design-icons";
+import { Copy, EyeOff, Lock, Trash2 } from "@/components/ui/design-icons";
+import { Popconfirm } from "@/components/ui/popconfirm";
 import { cn } from "@/lib/cn";
 
 import {
+	categoryOf,
 	FIELD_SOURCE_META,
 	FIELD_TYPE_LABEL,
 	type ProfileField,
 } from "../data";
+import { FieldValueInput } from "./field-value-input";
 
 type FieldRowProps = {
 	field: ProfileField;
 	removing: boolean;
 	onChange: (key: string, value: string) => void;
-	onCopy: (value: string) => void;
+	onCopy: (field: ProfileField) => void;
+	onCopyKey: (key: string) => void;
 	onDelete: (key: string) => void;
-};
-
-const VALUE_WIDTH: Partial<Record<ProfileField["type"], string>> = {
-	textarea: "max-w-lg",
-	email: "max-w-sm",
-	url: "max-w-sm",
+	onHide: (key: string) => void;
 };
 
 function ValueCell({
 	field,
 	onChange,
 }: Pick<FieldRowProps, "field" | "onChange">) {
-	if (field.readOnly) {
-		return (
-			<div className="flex items-center gap-2">
-				<span className="text-code-inline text-on-surface font-mono font-semibold">
-					{field.value}
-				</span>
-				<span className="bg-surface-container-high text-outline rounded-xs px-1.5 font-mono text-[10px] uppercase">
-					系统核心只读
-				</span>
-			</div>
-		);
-	}
-
-	const isSecret = field.type === "secret";
 	const input = (
-		<input
-			type="text"
-			aria-label={`${field.label} 的值`}
+		<FieldValueInput
+			type={field.type}
 			value={field.value}
-			onChange={(e) => onChange(field.key, e.target.value)}
-			className={cn(
-				"field-input bg-surface-container-low w-full px-2.5 py-1",
-				VALUE_WIDTH[field.type] ?? "max-w-xs",
-				isSecret ? "text-code-inline font-mono" : "text-body-sm",
-			)}
+			readOnly={field.readOnly}
+			label={`${field.label} 的值`}
+			onCommit={(value) => onChange(field.key, value)}
 		/>
 	);
-
-	if (!isSecret) return input;
+	if (!field.readOnly) return input;
 	return (
 		<div className="flex items-center gap-2">
-			<KeyRound className="text-tertiary size-4 shrink-0" />
 			{input}
+			<span className="bg-surface-container-high text-outline rounded-xs px-1.5 font-mono text-[10px] uppercase">
+				系统核心只读
+			</span>
 		</div>
 	);
 }
@@ -71,10 +53,12 @@ export const FieldRow = memo(function FieldRow({
 	removing,
 	onChange,
 	onCopy,
+	onCopyKey,
 	onDelete,
+	onHide,
 }: FieldRowProps) {
 	const source = FIELD_SOURCE_META[field.source];
-	const isCore = field.category === "core";
+	const isCore = categoryOf(field) === "core";
 
 	return (
 		<tr
@@ -92,6 +76,13 @@ export const FieldRow = memo(function FieldRow({
 				>
 					{field.key}
 				</span>
+				<IconButton
+					label={`复制字段键 ${field.key}`}
+					className="ml-1 align-middle"
+					onClick={() => onCopyKey(field.key)}
+				>
+					<Copy className="size-4" />
+				</IconButton>
 			</td>
 			<td className="text-on-surface px-4 py-3 font-medium">{field.label}</td>
 			<td className="px-4 py-3">
@@ -113,24 +104,34 @@ export const FieldRow = memo(function FieldRow({
 			</td>
 			<td className="px-4 py-3 text-right">
 				<div className="flex items-center justify-end gap-1">
-					<IconButton label="复制值" onClick={() => onCopy(field.value)}>
+					<IconButton label="复制值" onClick={() => onCopy(field)}>
 						<Copy className="size-4" />
 					</IconButton>
-					{field.readOnly ? (
+					{field.source === "custom" ? (
+						<Popconfirm onConfirm={() => onDelete(field.key)}>
+							{({ toggle, ...aria }) => (
+								<IconButton
+									label="删除字段"
+									tone="danger"
+									disabled={removing}
+									onClick={toggle}
+									aria-expanded={aria["aria-expanded"]}
+									aria-controls={aria["aria-controls"]}
+								>
+									<Trash2 className="size-4" />
+								</IconButton>
+							)}
+						</Popconfirm>
+					) : field.readOnly ? (
 						<span
-							title="系统核心字段不可删除"
+							title="系统核心字段不可屏蔽"
 							className="text-outline-variant cursor-not-allowed p-1.5"
 						>
 							<Lock className="size-4" />
 						</span>
 					) : (
-						<IconButton
-							label="删除字段"
-							tone="danger"
-							disabled={removing}
-							onClick={() => onDelete(field.key)}
-						>
-							<Trash2 className="size-4" />
+						<IconButton label="屏蔽字段" onClick={() => onHide(field.key)}>
+							<EyeOff className="size-4" />
 						</IconButton>
 					)}
 				</div>

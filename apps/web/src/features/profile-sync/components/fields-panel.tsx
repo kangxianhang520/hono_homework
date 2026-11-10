@@ -6,15 +6,11 @@ import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { useToast } from "@/components/ui/toast";
 import { useClipboard } from "@/hooks/use-clipboard";
 
-import {
-	FILTER_LABELS,
-	type FieldFilter,
-	INITIAL_FIELDS,
-	type ProfileField,
-} from "../data";
+import { FILTER_LABELS, type FieldFilter, type ProfileField } from "../data";
 import { useProfileFields } from "../hooks/use-profile-fields";
 import { AddFieldForm } from "./add-field-form";
 import { FieldsTable } from "./fields-table";
+import { HiddenFieldsBar } from "./hidden-fields-bar";
 
 const FILTER_ORDER: FieldFilter[] = ["all", "core", "custom", "sensitive"];
 
@@ -24,7 +20,7 @@ export function FieldsPanel() {
 	const copy = useClipboard();
 	const [adding, setAdding] = useState(false);
 	const {
-		fields,
+		allFields: fields,
 		visibleFields,
 		removing,
 		counts,
@@ -34,9 +30,12 @@ export function FieldsPanel() {
 		addField,
 		updateValue,
 		removeField,
+		hideField,
+		restoreField,
+		hiddenCoreFields,
 		setFilter,
 		setQuery,
-	} = useProfileFields(INITIAL_FIELDS, "custom");
+	} = useProfileFields("all");
 
 	const filterOptions = useMemo(
 		() =>
@@ -59,9 +58,40 @@ export function FieldsPanel() {
 		[removeField, showToast],
 	);
 
+	const handleHide = useCallback(
+		(key: string) => {
+			hideField(key);
+			showToast(`已屏蔽核心字段: ${key}`, "info");
+		},
+		[hideField, showToast],
+	);
+
 	const handleCopy = useCallback(
-		(value: string) => copy(value, `已复制: ${value}`),
+		(field: ProfileField) =>
+			copy(
+				field.value,
+				// secret 值不得出现在 Toast 文案里
+				field.type === "secret"
+					? `已复制 ${field.key} 的值`
+					: `已复制: ${field.value}`,
+			),
 		[copy],
+	);
+
+	const handleCopyKey = useCallback(
+		(key: string) => copy(key, `已复制字段键 ${key}`),
+		[copy],
+	);
+
+	const handleRestore = useCallback(
+		(key: string | "all") => {
+			restoreField(key);
+			showToast(
+				key === "all" ? "已恢复全部核心字段" : `已恢复核心字段: ${key}`,
+				"info",
+			);
+		},
+		[restoreField, showToast],
 	);
 
 	return (
@@ -115,12 +145,16 @@ export function FieldsPanel() {
 				hasKey={hasKey}
 			/>
 
+			<HiddenFieldsBar fields={hiddenCoreFields} onRestore={handleRestore} />
+
 			<FieldsTable
 				fields={visibleFields}
 				removing={removing}
 				onChange={updateValue}
 				onCopy={handleCopy}
+				onCopyKey={handleCopyKey}
 				onDelete={handleDelete}
+				onHide={handleHide}
 			/>
 		</Card>
 	);

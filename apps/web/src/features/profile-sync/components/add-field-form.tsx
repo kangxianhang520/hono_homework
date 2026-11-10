@@ -8,13 +8,13 @@ import {
 } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { ListPlus, Save, X } from "@/components/ui/design-icons";
-
 import {
 	FIELD_TYPE_OPTIONS,
 	type FieldValueType,
 	type ProfileField,
 } from "../data";
-import { categoryForType } from "../hooks/use-profile-fields";
+import { defaultValueFor, validateValue } from "../lib/field-values";
+import { FieldValueInput } from "./field-value-input";
 
 type AddFieldFormProps = {
 	open: boolean;
@@ -27,8 +27,8 @@ const EMPTY_FORM = {
 	key: "",
 	label: "",
 	type: "string" as FieldValueType,
-	value: "",
-	local: false,
+	value: defaultValueFor("string"),
+	writeBack: false,
 };
 const KEY_PATTERN = /^[a-zA-Z_]\w*$/;
 
@@ -91,7 +91,10 @@ export function AddFieldForm({
 		e.preventDefault();
 		const key = form.key.trim();
 		const label = form.label.trim();
-		if (!key || !label) return;
+		if (!key || !label) {
+			setError("字段键名与显示名称为必填项");
+			return;
+		}
 		if (!KEY_PATTERN.test(key)) {
 			setError("键名仅支持字母、数字与下划线，且不能以数字开头");
 			return;
@@ -100,13 +103,19 @@ export function AddFieldForm({
 			setError(`字段键 "${key}" 已存在`);
 			return;
 		}
+		const value = form.type === "string" ? form.value.trim() : form.value;
+		const valueError = validateValue(form.type, value);
+		if (valueError) {
+			setError(valueError);
+			return;
+		}
 		onSubmit({
 			key,
 			label,
-			value: form.value.trim(),
+			value,
 			type: form.type,
-			category: categoryForType(form.type),
 			source: "custom",
+			...(form.writeBack ? { writeBack: true } : {}),
 		});
 		setForm(EMPTY_FORM);
 	};
@@ -156,7 +165,15 @@ export function AddFieldForm({
 					<select
 						id={`${id}-type`}
 						value={form.type}
-						onChange={(e) => update("type", e.target.value as FieldValueType)}
+						onChange={(e) => {
+							const type = e.target.value as FieldValueType;
+							setForm((prev) => ({
+								...prev,
+								type,
+								value: defaultValueFor(type),
+							}));
+							setError(null);
+						}}
 						className={inputClass}
 					>
 						{FIELD_TYPE_OPTIONS.map((opt) => (
@@ -166,14 +183,28 @@ export function AddFieldForm({
 						))}
 					</select>
 				</FormItem>
-				<FormItem label="初始默认值 (Value) *" htmlFor={`${id}-value`}>
-					<input
-						id={`${id}-value`}
-						required
-						value={form.value}
-						onChange={(e) => update("value", e.target.value)}
-						placeholder="e.g. TN-ENG-9042"
+				<FormItem label="数据来源 (Source)" htmlFor={`${id}-source`}>
+					<select
+						id={`${id}-source`}
+						value={form.writeBack ? "writeBack" : "custom"}
+						onChange={(e) =>
+							update("writeBack", e.target.value === "writeBack")
+						}
 						className={inputClass}
+					>
+						<option value="custom">custom（仅本地）</option>
+						<option value="writeBack">custom + writeBack（同步回写）</option>
+					</select>
+				</FormItem>
+				<FormItem label="初始默认值 (Value)" htmlFor={`${id}-value`}>
+					<FieldValueInput
+						key={form.type}
+						type={form.type}
+						value={form.value}
+						label="初始默认值"
+						onCommit={(v) => update("value", v)}
+						onDraftChange={(v) => update("value", v)}
+						className="w-full"
 					/>
 				</FormItem>
 
@@ -187,17 +218,9 @@ export function AddFieldForm({
 				)}
 
 				<div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between md:col-span-12">
-					<label className="flex cursor-pointer items-center gap-2 select-none">
-						<input
-							type="checkbox"
-							checked={form.local}
-							onChange={(e) => update("local", e.target.checked)}
-							className="accent-primary size-4 rounded-xs"
-						/>
-						<span className="text-body-sm text-on-surface-variant">
-							同步保存为本地私有元数据 (不推送至 GitHub 公开 profile)
-						</span>
-					</label>
+					<p className="text-body-sm text-on-surface-variant">
+						writeBack 仅记录标记，本期不会调用 GitHub PATCH 接口
+					</p>
 					<div className="flex items-center gap-2">
 						<Button variant="subtle" onClick={close}>
 							取消

@@ -9,8 +9,10 @@ type FieldsTableProps = {
 	fields: ProfileField[];
 	removing: string[];
 	onChange: (key: string, value: string) => void;
-	onCopy: (value: string) => void;
+	onCopy: (field: ProfileField) => void;
+	onCopyKey: (key: string) => void;
 	onDelete: (key: string) => void;
+	onHide: (key: string) => void;
 };
 
 const COLUMNS = [
@@ -39,7 +41,9 @@ export function FieldsTable({
 	removing,
 	onChange,
 	onCopy,
+	onCopyKey,
 	onDelete,
+	onHide,
 }: FieldsTableProps) {
 	return (
 		<>
@@ -66,7 +70,9 @@ export function FieldsTable({
 								removing={removing.includes(field.key)}
 								onChange={onChange}
 								onCopy={onCopy}
+								onCopyKey={onCopyKey}
 								onDelete={onDelete}
+								onHide={onHide}
 							/>
 						))}
 					</tbody>

@@ -8,7 +8,10 @@ import {
 	useReducer,
 	useRef,
 } from "react";
-import { useSessionStorage } from "@/hooks/use-session-storage";
+import {
+	removeSessionStorageItem,
+	useSessionStorage,
+} from "@/hooks/use-session-storage";
 import { ApiError, fetchGitHubSync } from "./api/github";
 import type { GitHubSyncResponse } from "./api/types";
 
@@ -46,6 +49,8 @@ function reducer(state: SyncState, action: SyncAction): SyncState {
 
 export const PAT_KEY = "ghsync:pat";
 export const SNAPSHOT_KEY = "ghsync:snapshot";
+/** 字段管理(custom / hiddenKeys)的持久化 key;随 clear() 一起删除 */
+export const FIELDS_KEY = "ghsync:fields";
 
 export type SyncContextValue = SyncState & {
 	token: string;
@@ -55,6 +60,8 @@ export type SyncContextValue = SyncState & {
 	sync: () => Promise<void>;
 	retry: () => Promise<void>;
 	clear: () => void;
+	/** 订阅 clear();返回取消订阅函数。挂载中的模块借此重置内存 state */
+	onClear: (listener: () => void) => () => void;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -122,12 +129,24 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 		}
 	}, [setStoredSnapshot]);
 
+	const clearListenersRef = useRef(new Set<() => void>());
+	const onClear = useCallback((listener: () => void) => {
+		const listeners = clearListenersRef.current;
+		listeners.add(listener);
+		return () => {
+			listeners.delete(listener);
+		};
+	}, []);
+
 	const clear = useCallback(() => {
 		controllerRef.current?.abort();
 		controllerRef.current = null;
 		loadingRef.current = false;
 		removeToken();
 		removeSnapshot();
+		// 直接删除字段存储(含 secret),不依赖 FieldsPanel 是否挂载或 snapshot 是否变化
+		removeSessionStorageItem(FIELDS_KEY);
+		for (const listener of clearListenersRef.current) listener();
 		dispatch({ type: "reset" });
 	}, [removeToken, removeSnapshot]);
 
@@ -145,8 +164,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 			sync,
 			retry: sync,
 			clear,
+			onClear,
 		}),
-		[state, token, setToken, hydrated, sync, clear],
+		[state, token, setToken, hydrated, sync, clear, onClear],
 	);
 
 	return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

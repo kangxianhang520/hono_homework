@@ -30,6 +30,11 @@ function writeRaw(key: string, raw: string) {
 	memoryStore.set(key, raw);
 }
 
+/** 直接删除某个 key(含内存降级项),供不持有该 hook 实例的模块清理关联数据 */
+export function removeSessionStorageItem(key: string) {
+	removeRaw(key);
+}
+
 function removeRaw(key: string) {
 	memoryStore.delete(key);
 	try {

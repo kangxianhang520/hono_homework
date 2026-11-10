@@ -29,10 +29,10 @@ export function RawJsonPanel({ data, endpoint }: RawJsonPanelProps) {
 					className="text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors"
 				>
 					<Copy className="size-[15px]" />
-					复制 JSON
+					复制全部
 				</button>
 			</div>
-			<pre className="no-scrollbar text-on-surface selection:bg-primary-container selection:text-on-primary-container max-h-56 overflow-auto p-2 leading-relaxed">
+			<pre className="no-scrollbar text-on-surface selection:bg-primary-container selection:text-on-primary-container max-h-[60vh] overflow-auto p-2 leading-relaxed">
 				{json}
 			</pre>
 		</div>

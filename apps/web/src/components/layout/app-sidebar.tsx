@@ -22,17 +22,27 @@ export const NAV_ITEMS: NavItem[] = [
 	{ to: "/sync-history", label: "同步历史日志", icon: History },
 ];
 
-const RATE_LIMIT = { remaining: 4820, total: 5000 };
+export type RateLimitInfo = { remaining: number; limit: number };
 
-function RateLimitMeter() {
-	const percent = Math.round((RATE_LIMIT.remaining / RATE_LIMIT.total) * 100);
+function RateLimitMeter({ rateLimit }: { rateLimit: RateLimitInfo | null }) {
+	const percent =
+		rateLimit && rateLimit.limit > 0
+			? Math.min(
+					100,
+					Math.max(
+						0,
+						Math.round((rateLimit.remaining / rateLimit.limit) * 100),
+					),
+				)
+			: 0;
 	return (
 		<div className="bg-surface-container-low p-space-md rounded-lg">
 			<div className="mb-space-xs text-label-sm flex items-center justify-between font-mono">
 				<span className="text-on-surface-variant">API Rate Limit</span>
 				<span className="text-tertiary">
-					{RATE_LIMIT.remaining.toLocaleString()} /{" "}
-					{RATE_LIMIT.total.toLocaleString()}
+					{rateLimit
+						? `${rateLimit.remaining.toLocaleString()} / ${rateLimit.limit.toLocaleString()}`
+						: "— / —"}
 				</span>
 			</div>
 			<div
@@ -53,7 +63,11 @@ function RateLimitMeter() {
 }
 
 /** Fixed 256px left navigation rail (desktop). */
-export function AppSidebar() {
+export function AppSidebar({
+	rateLimit = null,
+}: {
+	rateLimit?: RateLimitInfo | null;
+}) {
 	return (
 		<aside className="bg-surface-container-lowest fixed inset-y-0 left-0 z-40 hidden w-64 flex-col pt-16 lg:flex">
 			<div className="p-space-lg">
@@ -89,7 +103,7 @@ export function AppSidebar() {
 			</nav>
 
 			<div className="p-space-lg mt-auto">
-				<RateLimitMeter />
+				<RateLimitMeter rateLimit={rateLimit} />
 			</div>
 		</aside>
 	);

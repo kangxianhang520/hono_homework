@@ -12,6 +12,10 @@ import type { Route } from "./+types/root";
 import { AppShell } from "./components/layout/app-shell";
 import { ThemeProvider } from "./components/theme-provider";
 import { ToastProvider } from "./components/ui/toast";
+import {
+	SyncProvider,
+	useGitHubSync,
+} from "./features/profile-sync/sync-context";
 
 export const links: Route.LinksFunction = () => [
 	{
@@ -48,6 +52,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
 	);
 }
 
+/** Adapter: feeds sync context into the presentational AppShell via props. */
+function ConnectedAppShell({ children }: { children: React.ReactNode }) {
+	const { status, snapshot } = useGitHubSync();
+	const rl = snapshot?.rateLimit;
+	return (
+		<AppShell
+			connection={status}
+			rateLimit={rl ? { remaining: rl.remaining, limit: rl.limit } : null}
+		>
+			{children}
+		</AppShell>
+	);
+}
+
 export default function App() {
 	return (
 		<ThemeProvider
@@ -58,9 +76,11 @@ export default function App() {
 			storageKey="vite-ui-theme"
 		>
 			<ToastProvider>
-				<AppShell>
-					<Outlet />
-				</AppShell>
+				<SyncProvider>
+					<ConnectedAppShell>
+						<Outlet />
+					</ConnectedAppShell>
+				</SyncProvider>
 			</ToastProvider>
 		</ThemeProvider>
 	);

@@ -21,6 +21,7 @@ pnpm run dev:web        # 仅前端
 pnpm run dev:server     # 仅后端
 pnpm run build          # 全量构建
 pnpm run check-types    # 类型检查（当前作为测试门禁）
+pnpm -F server test     # 后端单测（vitest run）
 pnpm run check          # Biome lint + format（--write）
 pnpm run env:generate   # 修改 .env.schema 后重新生成 env.ts
 pnpm run db:push        # 推送 schema 到数据库（另有 db:generate/db:migrate/db:studio）
@@ -51,8 +52,12 @@ biome.json turbo.json pnpm-workspace.yaml
 ## 模块规则（按需引入）
 
 - 前端（apps/web、packages/ui）：@rules/frontend.md
-- 后端（apps/server）：@rules/backend.md
+- 后端（apps/server）：@rules/backend-api.md
 - 数据库（packages/db）：@rules/database.md
+- 通用编码风格：@rules/coding-style.md
+- 测试（vitest，`pnpm -F server test`）：@rules/testing.md
+- 安全（token/env/CORS）：@rules/security.md
+- Git 工作流：@rules/git-workflow.md
 
 ## 项目踩坑与教训（自学习闭环，开发中持续追加）
 

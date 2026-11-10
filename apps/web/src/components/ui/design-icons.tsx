@@ -32,6 +32,7 @@ export const KeyRound = symbol("vpn_key");
 export const Key = symbol("key");
 export const SquareTerminal = symbol("terminal");
 export const Brush = symbol("cleaning_services");
+export const TriangleAlert = symbol("warning");
 export const CircleCheck = symbol("check_circle");
 export const CircleQuestionMark = symbol("help");
 export const Copy = symbol("content_copy");

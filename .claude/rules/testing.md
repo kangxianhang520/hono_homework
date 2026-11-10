@@ -35,6 +35,18 @@ globs: ["**/*.test.ts", "**/_.test.tsx", "**/_.spec.ts", "**/*.spec.tsx", "apps/
 - **数据库（Drizzle / PostgreSQL）**：单元测试不连真实数据库，把查询放在 service 函数里然后 mock 掉。确实需要集成测试时，用 `pnpm run db:start` 起的本地库，并且每个测试自己准备和清理数据。
 - **环境变量**：env 由 varlock 生成（`env.ts` / `env.server.ts`），测试中通过 mock 模块或设置 `process.env` 提供，不要读开发者本地的 `.env`。
 
+## 服务端测试现状（已落地，优先于上文"尚未配置"的描述）
+
+- `apps/server` 已接入 Vitest：`package.json` 有 `"test": "vitest run"`（devDependency `vitest`），`turbo.json` 已有 `test` 任务；没有单独的 `vitest.config.*`，用默认配置。
+- 运行：`pnpm -F server test`（或 `turbo run test -F server`）。web / packages 目前仍无测试。
+- 已有用例 `apps/server/src/routes/github.test.ts` 作为参考写法：
+  - 入口已拆为 `app.ts`（导出 app）+ `index.ts`（仅 `serve()`），测试只导入 `app.ts`。
+  - 先 `vi.mock("../env.server", () => ({ ENV: {...} }))`，再 `await import("../app")`，避免 varlock 校验本地 `.env`。
+  - `vi.stubGlobal("fetch", ...)` 必须配 `afterEach(() => vi.unstubAllGlobals())`。
+  - 超时不要用 fake timers 推进 `AbortSignal.timeout`，让 mock fetch 直接 reject `new DOMException("...", "TimeoutError")`。
+  - 带鉴权中间件的路由要补 OPTIONS 预检用例；GitHub 403 需区分限流（`x-ratelimit-remaining: 0`）与缺 scope，`/user/emails` 的 404 也按缺 scope 覆盖。
+- 改了 `apps/server` 时，完成前除类型检查外还需 `pnpm -F server test` 全绿。
+
 ## 禁止
 
 - 为了让检查通过而删除或跳过已有测试（`it.skip`、`describe.only` 不能提交）。

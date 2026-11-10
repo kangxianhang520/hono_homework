@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { StatusDot } from "@/components/ui/badge";
 import { BookOpen, ChevronDown } from "@/components/ui/design-icons";
+import { cn } from "@/lib/cn";
 
 const VIEWER_AVATAR = "/assets/profile-sync/viewer.jpg";
 
@@ -8,8 +9,42 @@ function Divider() {
 	return <span aria-hidden className="bg-surface-variant block h-4 w-px" />;
 }
 
+export type HeaderConnectionStatus = "idle" | "loading" | "success" | "error";
+
+const CONNECTION_VIEW = {
+	idle: {
+		label: "API v3 Not Connected",
+		dot: "bg-outline",
+		text: "text-on-surface-variant",
+		pulse: false,
+	},
+	loading: {
+		label: "API v3 Connecting...",
+		dot: "bg-primary",
+		text: "text-primary",
+		pulse: true,
+	},
+	success: {
+		label: "API v3 Connected",
+		dot: "bg-tertiary",
+		text: "text-tertiary",
+		pulse: true,
+	},
+	error: {
+		label: "API v3 Disconnected",
+		dot: "bg-error",
+		text: "text-error",
+		pulse: false,
+	},
+} as const;
+
 /** Fixed glassmorphic top bar. */
-export function AppHeader() {
+export function AppHeader({
+	connection = "success",
+}: {
+	connection?: HeaderConnectionStatus;
+}) {
+	const view = CONNECTION_VIEW[connection];
 	return (
 		<header className="bg-surface-container-lowest/85 px-margin md:px-margin-desktop fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-xl">
 			<div className="gap-space-lg flex min-w-0 items-center">
@@ -25,9 +60,15 @@ export function AppHeader() {
 					<Divider />
 				</span>
 				<span className="gap-space-xs bg-surface-container-high px-space-sm py-space-xs hidden items-center rounded-sm sm:inline-flex">
-					<StatusDot pulse className="size-2" />
-					<span className="text-label-sm text-tertiary font-mono tracking-wider uppercase">
-						API v3 Connected
+					<StatusDot pulse={view.pulse} className={cn("size-2", view.dot)} />
+					<span
+						role="status"
+						className={cn(
+							"text-label-sm font-mono tracking-wider uppercase",
+							view.text,
+						)}
+					>
+						{view.label}
 					</span>
 				</span>
 			</div>

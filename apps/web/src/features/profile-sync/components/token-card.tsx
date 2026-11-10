@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { Badge, StatusDot } from "@/components/ui/badge";
+import { useState } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -10,7 +9,6 @@ import {
 	Download,
 	Eye,
 	EyeOff,
-	Gauge,
 	KeyRound,
 	Lock,
 	RefreshCw,
@@ -18,15 +16,31 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { useClipboard } from "@/hooks/use-clipboard";
 import { cn } from "@/lib/cn";
+import { downloadJson, profileExportFilename } from "@/lib/download";
 
-import { MOCK_TOKEN } from "../data";
+import { useGitHubSync } from "../sync-context";
+import { ConnectionBadge } from "./connection-badge";
+import { RateLimitBadge } from "./rate-limit-badge";
+import { SyncErrorAlert } from "./sync-error-alert";
 import { TokenGuide } from "./token-guide";
 
-const FETCH_DURATION_MS = 1100;
+const REQUIRED_SCOPES = ["read:user", "user:email"] as const;
 
-function ScopeChip({ children }: { children: string }) {
+function ScopeChip({
+	children,
+	missing = false,
+}: {
+	children: string;
+	missing?: boolean;
+}) {
 	return (
-		<code className="code-chip bg-surface-container-lowest text-secondary px-1">
+		<code
+			className={cn(
+				"code-chip bg-surface-container-lowest px-1",
+				missing ? "text-error font-semibold" : "text-secondary",
+			)}
+			title={missing ? "Token 缺少该权限" : undefined}
+		>
 			{children}
 		</code>
 	);
@@ -36,21 +50,38 @@ function ScopeChip({ children }: { children: string }) {
 export function TokenCard() {
 	const { showToast } = useToast();
 	const copy = useClipboard();
-	const [token, setToken] = useState(MOCK_TOKEN);
+	const { token, setToken, status, snapshot, sync, error, retry, clear } =
+		useGitHubSync();
 	const [revealed, setRevealed] = useState(false);
 	const [guideOpen, setGuideOpen] = useState(false);
-	const [fetching, setFetching] = useState(false);
-	const fetchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+	const fetching = status === "loading";
+	// fine-grained PAT 无 x-oauth-scopes 头，scopes 为空不代表缺权限，此时不做对比
+	const grantedScopes = snapshot?.scopes ?? [];
+	const canCompare = grantedScopes.length > 0;
+	// classic PAT 的父级 `user` scope 同时包含 read:user 与 user:email
+	const isMissing = (scope: string) =>
+		canCompare &&
+		!grantedScopes.includes(scope) &&
+		!(
+			grantedScopes.includes("user") &&
+			(scope === "read:user" || scope === "user:email")
+		);
 
-	// Cancel the simulated request if the card unmounts mid-flight
-	useEffect(() => () => clearTimeout(fetchTimer.current), []);
+	const handleFetch = async () => {
+		await sync();
+	};
 
-	const handleFetch = () => {
-		setFetching(true);
-		fetchTimer.current = setTimeout(() => {
-			setFetching(false);
-			showToast("已成功从 GitHub API 拉取最新账户信息！", "success");
-		}, FETCH_DURATION_MS);
+	const handleClear = () => {
+		clear();
+		setRevealed(false);
+		showToast("已清理 PAT 缓存与会话状态", "info");
+	};
+
+	const handleExport = () => {
+		if (!snapshot) return;
+		// snapshot 为服务端响应，不含 PAT
+		downloadJson(snapshot, profileExportFilename(snapshot.user.login));
+		showToast("已导出原始 JSON", "success");
 	};
 
 	return (
@@ -75,14 +106,8 @@ export function TokenCard() {
 					</div>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
-					<Badge tone="success">
-						<StatusDot />
-						已验证 / Validated
-					</Badge>
-					<Badge tone="neutral" className="gap-1">
-						<Gauge className="size-3.5" />
-						4,982 / 5,000 req/hr
-					</Badge>
+					<ConnectionBadge status={status} hasSnapshot={snapshot !== null} />
+					<RateLimitBadge />
 				</div>
 			</div>
 
@@ -146,8 +171,24 @@ export function TokenCard() {
 					<p className="text-body-sm text-on-surface-variant flex items-center gap-2">
 						<CircleCheck className="text-tertiary size-3.5" />
 						<span>
-							需要具备 <ScopeChip>read:user</ScopeChip> 与{" "}
-							<ScopeChip>user:email</ScopeChip> 权限范围
+							需要具备{" "}
+							<ScopeChip missing={isMissing(REQUIRED_SCOPES[0])}>
+								{REQUIRED_SCOPES[0]}
+							</ScopeChip>{" "}
+							与{" "}
+							<ScopeChip missing={isMissing(REQUIRED_SCOPES[1])}>
+								{REQUIRED_SCOPES[1]}
+							</ScopeChip>{" "}
+							权限范围
+							{canCompare && (
+								<span className="ml-1">
+									（已授予：
+									<code className="code-chip px-0.5">
+										{grantedScopes.join(", ")}
+									</code>
+									）
+								</span>
+							)}
 						</span>
 					</p>
 				</div>
@@ -157,7 +198,8 @@ export function TokenCard() {
 						variant="primary"
 						size="lg"
 						onClick={handleFetch}
-						disabled={fetching}
+						disabled={fetching || token.trim() === ""}
+						aria-busy={fetching}
 						className="group flex-1 gap-2"
 					>
 						<RefreshCw
@@ -172,7 +214,7 @@ export function TokenCard() {
 						size="icon"
 						title="清除本地缓存"
 						aria-label="清除本地缓存"
-						onClick={() => showToast("已清理 PAT 缓存与会话状态", "info")}
+						onClick={handleClear}
 					>
 						<Brush className="size-5" />
 					</Button>
@@ -180,12 +222,22 @@ export function TokenCard() {
 						size="icon"
 						title="导出原始 JSON"
 						aria-label="导出原始 JSON"
-						onClick={() => showToast("正在导出完整账户同步数据...", "info")}
+						onClick={handleExport}
+						disabled={!snapshot}
 					>
 						<Download className="size-5" />
 					</Button>
 				</div>
 			</div>
+
+			{status === "error" && error && (
+				<SyncErrorAlert
+					error={error}
+					retrying={fetching}
+					onRetry={() => void retry()}
+					onOpenGuide={() => setGuideOpen(true)}
+				/>
+			)}
 
 			<TokenGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
 		</Card>
